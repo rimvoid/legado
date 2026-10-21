@@ -1,5 +1,16 @@
 package io.legado.app.ui.config
 
+import android.widget.ScrollView
+import android.widget.TextView
+import io.legado.app.constant.PreferKey
+import io.legado.app.help.adaptive.AdaptiveUiController
+import io.legado.app.help.adaptive.AdaptivePanePolicy
+import io.legado.app.help.adaptive.AdaptiveSettingsRow
+import io.legado.app.lib.theme.bottomBackground
+import io.legado.app.lib.theme.primaryTextColor
+import io.legado.app.lib.theme.primaryColor
+import io.legado.app.lib.theme.uiTypeface
+import io.legado.app.utils.observeSharedPreferences
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -48,6 +59,10 @@ private const val CONFIG_MENU_HOST_WIDTH_DP = 128
 
 class ConfigActivity : VMBaseActivity<ViewBinding, ConfigViewModel>() {
 
+    private lateinit var adaptiveBody: LinearLayout
+    private lateinit var adaptiveNavigation: ScrollView
+    private lateinit var adaptiveDivider: View
+    private lateinit var navigationRows: LinearLayout
     private lateinit var titleComposeView: ComposeView
     private lateinit var menuToolbar: Toolbar
     private var titleText by mutableStateOf("")
@@ -90,6 +105,23 @@ class ConfigActivity : VMBaseActivity<ViewBinding, ConfigViewModel>() {
                 windowInsets
             }
         }
+        navigationRows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        adaptiveNavigation = ScrollView(this).apply {
+            isFillViewport = true
+            visibility = View.GONE
+            setBackgroundColor(this@ConfigActivity.bottomBackground)
+            addView(navigationRows)
+        }
+        adaptiveDivider = View(this).apply {
+            visibility = View.GONE
+            setBackgroundColor(0x22888888)
+        }
+        adaptiveBody = AdaptiveSettingsRow(this).apply {
+            addView(adaptiveNavigation, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+            addView(adaptiveDivider, LinearLayout.LayoutParams(1.dpToPx(), ViewGroup.LayoutParams.MATCH_PARENT))
+            addView(FrameLayout(this@ConfigActivity).apply { id = R.id.configFrameLayout },
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+        }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = ViewGroup.LayoutParams(
@@ -104,9 +136,7 @@ class ConfigActivity : VMBaseActivity<ViewBinding, ConfigViewModel>() {
                 )
             )
             addView(
-                FrameLayout(this@ConfigActivity).apply {
-                    id = R.id.configFrameLayout
-                },
+                adaptiveBody,
                 LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     0,
@@ -146,6 +176,58 @@ class ConfigActivity : VMBaseActivity<ViewBinding, ConfigViewModel>() {
             ConfigTag.DISCOVERY_CONFIG -> replaceFragment(configTag, DiscoveryConfigFragment::class.java)
             ConfigTag.SUBSCRIPTION_CONFIG -> replaceFragment(configTag, SubscriptionConfigFragment::class.java)
             else -> finish()
+        }
+        setupAdaptiveNavigation()
+        adaptiveBody.addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
+            if (right - left != oldRight - oldLeft) updateAdaptiveLayout()
+        }
+        adaptiveBody.post { updateAdaptiveLayout() }
+        observeSharedPreferences { _, key ->
+            if (key == PreferKey.tabletFoldOptimization) adaptiveBody.post { updateAdaptiveLayout() }
+        }
+
+    }
+
+    private fun updateAdaptiveLayout() {
+        val usePanes = AdaptivePanePolicy.useTwoPanes(
+            AdaptiveUiController.enabled(this),
+            (adaptiveBody.width / resources.displayMetrics.density).toInt(),
+            resources.configuration.screenHeightDp
+        ) && !AdaptiveUiController.embedded(this)
+        val target = if (usePanes) View.VISIBLE else View.GONE
+        if (adaptiveNavigation.visibility != target) {
+            adaptiveNavigation.visibility = target
+            adaptiveDivider.visibility = target
+        }
+    }
+
+    private fun setupAdaptiveNavigation() {
+        val pages: List<Triple<String, String, Class<out Fragment>>> = listOf(
+            Triple("界面设置", ConfigTag.THEME_CONFIG, ThemeConfigFragment::class.java),
+            Triple("AI 设置", ConfigTag.AI_CONFIG, AiConfigFragment::class.java),
+            Triple("网络与 DNS", ConfigTag.NETWORK_DNS_CONFIG, NetworkDnsConfigFragment::class.java),
+            Triple("备份与恢复", ConfigTag.BACKUP_CONFIG, BackupConfigFragment::class.java),
+            Triple("封面设置", ConfigTag.COVER_CONFIG, CoverConfigFragment::class.java),
+            Triple("发现设置", ConfigTag.DISCOVERY_CONFIG, DiscoveryConfigFragment::class.java),
+            Triple("订阅设置", ConfigTag.SUBSCRIPTION_CONFIG, SubscriptionConfigFragment::class.java),
+            Triple("其他设置", ConfigTag.OTHER_CONFIG, OtherConfigFragment::class.java)
+        )
+        navigationRows.removeAllViews()
+        pages.forEach { (label, tag, fragmentClass) ->
+            navigationRows.addView(TextView(this).apply {
+                text = label
+                textSize = 16f
+                typeface = this@ConfigActivity.uiTypeface()
+                gravity = Gravity.CENTER_VERTICAL
+                minHeight = 64.dpToPx()
+                setPadding(20.dpToPx(), 12.dpToPx(), 16.dpToPx(), 12.dpToPx())
+                setTextColor(if (intent.getStringExtra("configTag") == tag) this@ConfigActivity.primaryColor
+                    else this@ConfigActivity.primaryTextColor)
+                setOnClickListener {
+                    replaceFragment(tag, fragmentClass)
+                    setupAdaptiveNavigation()
+                }
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
     }
 

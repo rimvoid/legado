@@ -98,6 +98,7 @@ class App : Application() {
         oldConfig = Configuration(resources.configuration)
         applyDayNightInit(this)
         registerActivityLifecycleCallbacks(LifecycleHelp)
+        io.legado.app.help.adaptive.AdaptiveUiController.install(this)
         defaultSharedPreferences.registerOnSharedPreferenceChangeListener(AppConfig)
         Coroutine.async {
             RestoreJournal.recoverIfNeeded("应用启动检测到上次恢复未完成")

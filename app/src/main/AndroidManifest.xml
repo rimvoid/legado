@@ -31,13 +31,14 @@
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
-        android:icon="@drawable/ic_launcher_agent"
+        android:icon="@mipmap/ic_launcher"
         android:label="${app_name}"
         android:networkSecurityConfig="@xml/network_security_config"
         android:requestLegacyExternalStorage="true"
         android:supportsRtl="true"
         android:theme="@style/AppTheme.Light"
         tools:ignore="AllowBackup,GoogleAppIndexingWarning,UnusedAttribute">
+        <property android:name="android.window.PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENABLED" android:value="true" />
         <!-- 主入口 -->
         <activity
             android:name=".ui.welcome.WelcomeActivity"
@@ -54,7 +55,7 @@
             android:name=".ui.welcome.Launcher1"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/launcher1"
+            android:icon="@mipmap/ic_launcher"
             android:theme="@style/AppTheme.Welcome">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -67,7 +68,7 @@
             android:name=".ui.welcome.Launcher2"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/launcher2"
+            android:icon="@mipmap/ic_launcher"
             android:theme="@style/AppTheme.Welcome">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -80,7 +81,7 @@
             android:name=".ui.welcome.Launcher3"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/launcher3"
+            android:icon="@mipmap/ic_launcher"
             android:theme="@style/AppTheme.Welcome">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -93,7 +94,7 @@
             android:name=".ui.welcome.Launcher4"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/launcher4"
+            android:icon="@mipmap/ic_launcher"
             android:theme="@style/AppTheme.Welcome">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -106,7 +107,7 @@
             android:name=".ui.welcome.Launcher5"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/launcher5"
+            android:icon="@mipmap/ic_launcher"
             android:theme="@style/AppTheme.Welcome">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -119,7 +120,7 @@
             android:name=".ui.welcome.Launcher6"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/launcher6"
+            android:icon="@mipmap/ic_launcher"
             android:theme="@style/AppTheme.Welcome">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -132,7 +133,7 @@
             android:name=".ui.welcome.Launcher7"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/launcher7"
+            android:icon="@mipmap/ic_launcher"
             android:theme="@style/AppTheme.Welcome">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

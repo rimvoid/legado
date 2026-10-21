@@ -465,6 +465,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
 
     private fun selectFragmentId(fragmentId: Int, smoothScroll: Boolean) {
+        io.legado.app.help.adaptive.AdaptiveUiController.returnToRoot(this)
         realPositions.take(bottomMenuCount).indexOf(fragmentId)
             .takeIf { it >= 0 }
             ?.let { binding.viewPagerMain.setCurrentItem(it, smoothScroll) }
@@ -477,6 +478,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
 
     override fun onNavigationItemReselected(item: MenuItem) {
+        io.legado.app.help.adaptive.AdaptiveUiController.returnToRoot(this)
         when (item.itemId) {
             R.id.menu_bookshelf -> {
                 if (System.currentTimeMillis() - bookshelfReselected > 300) {

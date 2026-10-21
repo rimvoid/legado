@@ -40,6 +40,13 @@ class ThemeConfigFragment : ComposeSettingFragment(), MenuProvider {
             sections = listOf(
                 SettingSectionSpec(
                     items = listOf(
+                        SettingSwitchSpec(
+                            key = PreferKey.tabletFoldOptimization,
+                            title = "平板/折叠屏优化",
+                            summary = "大屏并排显示列表与详情；支持时可拖动分隔条，否则等分。关闭恢复原版界面，不改变阅读内容页。",
+                            checked = booleanSetting(PreferKey.tabletFoldOptimization, false),
+                            onCheckedChange = { updateBooleanSetting(PreferKey.tabletFoldOptimization, it) }
+                        ),
                         SettingChoiceSpec(
                             key = PreferKey.launcherIcon,
                             title = getString(R.string.change_icon),

@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.os.Build
 import androidx.annotation.Keep
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.ui.book.read.FollowReaderAppearance
 import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.entities.TextLine
@@ -48,7 +49,9 @@ data class TextColumn(
         } else {
             ChapterProvider.contentPaint
         }
-        val textColor = if (textLine.isReadAloud || isSearchResult) {
+        val textColor = if (textLine.isReadAloud && FollowReaderAppearance.highlight) {
+            FollowReaderAppearance.textColor
+        } else if (textLine.isReadAloud || isSearchResult) {
             ReadBookConfig.textAccentColor
         } else {
             ReadBookConfig.textColor

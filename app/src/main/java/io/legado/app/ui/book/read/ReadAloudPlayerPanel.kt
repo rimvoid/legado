@@ -12,6 +12,8 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatImageView
 import androidx.core.view.ViewCompat
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
@@ -87,6 +89,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -186,13 +190,20 @@ class ReadAloudPlayerPanel @JvmOverloads constructor(
         fun onClickReadAloud()
         fun finish()
         fun openBookCharacters()
+        fun refreshFollowAppearance()
+        fun showFollowPosition(position: Int)
+        fun followReaderLines(): List<NativeFollowLine>
+        fun commitFollowLine(line: NativeFollowLine)
+        fun previewFollowLine(line: NativeFollowLine)
+        fun turnFollowPage(direction: Int): Boolean
         fun onReadAloudPlayerVisibilityChanged(visible: Boolean)
     }
 
     enum class DisplayMode {
         Immersive,
         Scene,
-        Text
+        Text,
+        Follow
     }
 
     enum class PanelPhase {
@@ -320,6 +331,8 @@ class ReadAloudPlayerPanel @JvmOverloads constructor(
         val focusText: FocusTextUi = FocusTextUi(),
         val speechRate: Int = AppConfig.ttsSpeechRate.coerceIn(0, 45),
         val followSystemSpeechRate: Boolean = AppConfig.ttsFlowSys,
+        val iconLabels: Boolean = AppConfig.readAloudIconLabels,
+        val followHighlight: Boolean = AppConfig.readAloudFollowHighlight,
         val mode: DisplayMode = DisplayMode.Immersive,
         val foregroundActive: Boolean = true,
         val expanded: Boolean = false,
@@ -410,6 +423,7 @@ class ReadAloudPlayerPanel @JvmOverloads constructor(
                 onEngineSheetOpen = ::refreshTtsEngineOptions,
                 onProgressSeek = ::seekToParagraphProgress,
                 onCueSelect = ::seekToChapterPosition,
+                nativeReader = callBack,
                 capsulePosition = capsulePosition,
                 onCapsulePositionChange = ::updateCapsulePosition,
                 onCapsuleBounds = ::updateCapsuleBounds,
@@ -868,6 +882,7 @@ class ReadAloudPlayerPanel @JvmOverloads constructor(
     }
 
     fun onReadAloudConfigChanged(scope: String?) {
+        if (scope == "follow_ui") callBack?.refreshFollowAppearance()
         when (scope) {
             EventBus.READ_ALOUD_CONFIG_SCOPE_ENGINE,
             EventBus.READ_ALOUD_CONFIG_SCOPE_SPEECH -> {
@@ -1085,21 +1100,8 @@ class ReadAloudPlayerPanel @JvmOverloads constructor(
         val model = buildChapterModel()
         val targetCueIndex = model?.indexForChapterPosition(targetPos) ?: -1
         ReadBook.durChapterPos = targetPos
-        if (BaseReadAloudService.isRun && targetCueIndex >= 0) {
-            ReadAloud.moveToCue(
-                context = context,
-                cueIndex = targetCueIndex,
-                chapterPosition = targetPos,
-                play = true
-            )
-        } else {
-            ReadAloud.play(
-                context = context,
-                play = true,
-                pageIndex = pageIndex,
-                startPos = startPos
-            )
-        }
+        callBack?.showFollowPosition(targetPos)
+        ReadAloud.play(context = context, play = true, pageIndex = pageIndex, startPos = startPos)
         lastChapterStart = targetPos
         uiState = buildState(uiState.mode)
     }
@@ -1726,6 +1728,7 @@ private fun ReadAloudPlayerContent(
     onEngineSheetOpen: () -> Unit,
     onProgressSeek: (Float) -> Unit,
     onCueSelect: (Int) -> Unit,
+    nativeReader: ReadAloudPlayerPanel.CallBack?,
     capsulePosition: CapsulePositionState,
     onCapsulePositionChange: (Float, Float) -> Unit,
     onCapsuleBounds: (RectF) -> Unit,
@@ -1746,6 +1749,17 @@ private fun ReadAloudPlayerContent(
     var sceneFullscreen by remember { mutableStateOf(false) }
     var sceneFullscreenTopBarHeight by remember { mutableStateOf(0.dp) }
     var editingRoleSegment by remember { mutableStateOf<AiReadAloudRolePreviewSegment?>(null) }
+    val followActive = state.mode == ReadAloudPlayerPanel.DisplayMode.Follow
+    var followDragging by remember { mutableStateOf(false) }
+    var animateFollowDock by remember { mutableStateOf(true) }
+    DisposableEffect(followActive, state.followHighlight) {
+        FollowReaderAppearance.active = followActive
+        nativeReader?.refreshFollowAppearance()
+        onDispose { FollowReaderAppearance.active = false; nativeReader?.refreshFollowAppearance() }
+    }
+    PlayerBackHandler(enabled = followActive && state.panelPhase == ReadAloudPlayerPanel.PanelPhase.Expanded) {
+        if (state.playing) onPlayPause() else onStop()
+    }
     val sceneFullscreenActive = sceneFullscreen &&
             state.mode == ReadAloudPlayerPanel.DisplayMode.Scene &&
             state.panelPhase == ReadAloudPlayerPanel.PanelPhase.Expanded &&
@@ -1800,11 +1814,20 @@ private fun ReadAloudPlayerContent(
                     fadeOut(tween(180, easing = FastOutSlowInEasing))
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                CoverAtmosphereBackdrop(
+                if (!followActive) CoverAtmosphereBackdrop(
                     state = state,
                     colors = colors,
                     animateFluid = !sceneFullscreenActive
                 )
+        if (followActive) {
+            FollowReaderStage(
+                state = state, colors = colors, nativeReader = nativeReader,
+                onTogglePlayback = { animateFollowDock = true; onPlayPause() },
+                onSeek = onCueSelect,
+                onDragging = { if (it) animateFollowDock = false; followDragging = it },
+                modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
+            )
+        }
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val landscape = maxWidth > maxHeight
             val short = maxHeight < 660.dp
@@ -1825,7 +1848,7 @@ private fun ReadAloudPlayerContent(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 AnimatedVisibility(
-                    visible = !sceneFullscreenActive,
+                    visible = !sceneFullscreenActive && !followActive,
                     enter = fadeIn(tween(180, easing = FastOutSlowInEasing)) +
                             expandVertically(tween(180, easing = FastOutSlowInEasing)),
                     exit = shrinkVertically(tween(160, easing = FastOutSlowInEasing)) +
@@ -1852,7 +1875,9 @@ private fun ReadAloudPlayerContent(
                         Spacer(modifier = Modifier.height(if (veryShort) 4.dp else 10.dp))
                     }
                 }
-                if (landscape) {
+                if (followActive) {
+                    Spacer(Modifier.weight(1f))
+                } else if (landscape) {
                     LandscapePlayerBody(
                         state = state,
                         colors = colors,
@@ -1881,15 +1906,38 @@ private fun ReadAloudPlayerContent(
                     )
                 }
                 AnimatedVisibility(
-                    visible = !sceneFullscreenActive,
-                    enter = fadeIn(tween(180, easing = FastOutSlowInEasing)) +
-                            expandVertically(tween(180, easing = FastOutSlowInEasing)),
-                    exit = shrinkVertically(tween(160, easing = FastOutSlowInEasing)) +
-                            fadeOut(tween(140, easing = FastOutSlowInEasing))
+                    visible = !sceneFullscreenActive && (!followActive || (!state.playing && !followDragging)),
+                    enter = if (followActive) {
+                        if (animateFollowDock) fadeIn(tween(220, easing = FastOutSlowInEasing)) +
+                            slideInVertically(tween(260, easing = FastOutSlowInEasing)) { it / 12 }
+                        else EnterTransition.None
+                    } else fadeIn(tween(180)) + expandVertically(tween(180)),
+                    exit = if (followActive) {
+                        if (animateFollowDock) fadeOut(tween(240, easing = FastOutSlowInEasing)) +
+                            slideOutVertically(tween(260, easing = FastOutSlowInEasing)) { it / 12 }
+                        else ExitTransition.None
+                    } else shrinkVertically(tween(160)) + fadeOut(tween(140))
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        modifier = if (followActive) Modifier
+                            .clip(LocalContext.current.composePanelShape())
+                            .background(colors.panelStrong.copy(alpha = 0.96f))
+                            .padding(12.dp) else Modifier,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        if (followActive) {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                    ModeSwitch(state.mode, state.multiRoleEnabled, colors) {
+                                        sheetVisible = false
+                                        onModeChange(it)
+                                    }
+                                }
+                                HeaderIconButton(R.drawable.ic_settings, "听书设置", colors, onOpenSettings)
+                            }
+                        }
                         Spacer(modifier = Modifier.height(if (veryShort) 8.dp else 14.dp))
-                        MinimalProgress(state, colors, onProgressSeek)
+                        MinimalProgress(state, colors) { animateFollowDock = true; onProgressSeek(it) }
                         Spacer(modifier = Modifier.height(if (veryShort) 8.dp else 12.dp))
                         PlayerControlDock(
                             state = state,
@@ -1906,7 +1954,7 @@ private fun ReadAloudPlayerContent(
                                     sheetVisible = true
                                 }
                             },
-                            onPlayPause = onPlayPause,
+                            onPlayPause = { animateFollowDock = true; onPlayPause() },
                             onPreviousChapter = onPreviousChapter,
                             onNextChapter = onNextChapter,
                             onOpenChapterList = onOpenChapterList
@@ -3481,11 +3529,12 @@ private fun ModeSwitch(
             add(ReadAloudPlayerPanel.DisplayMode.Immersive to "沉浸")
             if (multiRoleEnabled) add(ReadAloudPlayerPanel.DisplayMode.Scene to "情景")
             add(ReadAloudPlayerPanel.DisplayMode.Text to "原文")
+            add(ReadAloudPlayerPanel.DisplayMode.Follow to "跟随")
         }
     }
     Row(
         modifier = Modifier
-            .width(if (multiRoleEnabled) 188.dp else 132.dp)
+            .width(if (multiRoleEnabled) 240.dp else 196.dp)
             .height(32.dp)
             .clip(actionShape)
             .background(Color.White.copy(alpha = 0.13f))
@@ -3586,7 +3635,7 @@ private fun PortraitPlayerBody(
             modifier = modifier
         )
 
-        ReadAloudPlayerPanel.DisplayMode.Text -> LyricsPlayerStage(
+        ReadAloudPlayerPanel.DisplayMode.Text, ReadAloudPlayerPanel.DisplayMode.Follow -> LyricsPlayerStage(
             state = state,
             colors = colors,
             compact = short,
@@ -4680,6 +4729,7 @@ private fun PlayerControlDock(
                 text = context.getString(R.string.chapter_list),
                 selected = activeSheet == PlayerSheet.Chapter,
                 colors = colors,
+                showText = state.iconLabels,
                 modifier = Modifier.weight(1f)
             ) {
                 onSheetChange(PlayerSheet.Chapter)
@@ -4690,6 +4740,7 @@ private fun PlayerControlDock(
                 else context.getString(R.string.set_timer),
                 selected = activeSheet == PlayerSheet.Timer,
                 colors = colors,
+                showText = state.iconLabels,
                 modifier = Modifier.weight(1f)
             ) {
                 onSheetChange(PlayerSheet.Timer)
@@ -4699,6 +4750,7 @@ private fun PlayerControlDock(
                 text = "\u5f15\u64ce",
                 selected = activeSheet == PlayerSheet.Engine,
                 colors = colors,
+                showText = state.iconLabels,
                 modifier = Modifier.weight(1f)
             ) {
                 onSheetChange(PlayerSheet.Engine)
@@ -4709,6 +4761,7 @@ private fun PlayerControlDock(
                 text = "\u89d2\u8272",
                 selected = activeSheet == PlayerSheet.Characters,
                 colors = colors,
+                showText = state.iconLabels,
                 modifier = Modifier.weight(1f)
             ) {
                 onSheetChange(PlayerSheet.Characters)
@@ -4752,6 +4805,7 @@ private fun FeaturePill(
     selected: Boolean,
     colors: PlayerColors,
     modifier: Modifier = Modifier,
+    showText: Boolean = true,
     onClick: () -> Unit
 ) {
     val actionShape = LocalContext.current.composeActionShape()
@@ -4765,7 +4819,7 @@ private fun FeaturePill(
         shadowElevation = if (selected) 8.dp else 0.dp
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp),
+            modifier = Modifier.padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
@@ -4775,15 +4829,13 @@ private fun FeaturePill(
                 tint = if (selected) colors.accentText else colors.primaryText,
                 modifier = Modifier.size(17.dp)
             )
-            Spacer(modifier = Modifier.width(5.dp))
-            Text(
-                text = text,
-                color = if (selected) colors.accentText else colors.primaryText,
-                fontSize = 11.sp,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+
+            if (showText) {
+                Spacer(Modifier.width(5.dp))
+                Text(text, fontSize = 12.sp, maxLines = 1,
+                    color = if (selected) colors.accentText else colors.primaryText)
+            }
+
         }
     }
 }

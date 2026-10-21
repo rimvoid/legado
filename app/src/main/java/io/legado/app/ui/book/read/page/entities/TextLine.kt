@@ -7,6 +7,8 @@ import android.graphics.Paint
 import android.graphics.Paint.FontMetrics
 import android.os.Build
 import androidx.annotation.Keep
+import io.legado.app.ui.book.read.FollowReaderAppearance
+import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
 import io.legado.app.help.PaintPool
 import io.legado.app.help.book.isImage
 import io.legado.app.help.config.AppConfig
@@ -172,6 +174,16 @@ data class TextLine(
     }
 
     private fun drawTextLine(view: ContentTextView, canvas: Canvas) {
+        if (isReadAloud && FollowReaderAppearance.highlight) {
+            val background = PaintPool.obtain()
+            background.color = FollowReaderAppearance.backgroundColor
+            for (column in columns) {
+                if (column is TextBaseColumn && column.charData.isNotBlank()) {
+                    canvas.drawRect(column.start, 0f, column.end, height, background)
+                }
+            }
+            PaintPool.recycle(background)
+        }
         if (checkFastDraw()) {
             fastDrawTextLine(view, canvas)
         } else {
@@ -204,7 +216,9 @@ data class TextLine(
         } else {
             ChapterProvider.contentPaint
         }
-        val textColor = if (isReadAloud) {
+        val textColor = if (isReadAloud && FollowReaderAppearance.highlight) {
+            FollowReaderAppearance.textColor
+        } else if (isReadAloud) {
             ReadBookConfig.textAccentColor
         } else {
             ReadBookConfig.textColor
@@ -214,6 +228,7 @@ data class TextLine(
         }
         val paint = PaintPool.obtain()
         paint.set(textPaint)
+        if (isReadAloud && FollowReaderAppearance.highlight) paint.isFakeBoldText = true
         val letterSpacing = paint.letterSpacing * paint.textSize
         val letterSpacingHalf = letterSpacing * 0.5f
         if (extraLetterSpacing != 0f) {

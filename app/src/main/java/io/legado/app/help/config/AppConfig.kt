@@ -1272,6 +1272,11 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val aiReadAloudSfxVolumeScale: Float
         get() = aiReadAloudSfxVolume / 100f
 
+    val readAloudIconLabels: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.readAloudIconLabels, true)
+    val readAloudFollowHighlight: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.readAloudFollowHighlight, true)
+
     var readAloudSpeakerLoudnessEnabled: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.readAloudSpeakerLoudnessEnabled, true)
         set(value) = appCtx.putPrefBoolean(PreferKey.readAloudSpeakerLoudnessEnabled, value)
