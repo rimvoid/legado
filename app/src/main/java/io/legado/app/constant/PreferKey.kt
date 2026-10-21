@@ -2,6 +2,9 @@ package io.legado.app.constant
 
 @Suppress("ConstPropertyName")
 object PreferKey {
+    const val tabletFoldOptimization = "tabletFoldOptimization"
+    const val readAloudIconLabels = "readAloudIconLabels"
+    const val readAloudFollowHighlight = "readAloudFollowHighlight"
     const val language = "language"
     const val fontScale = "fontScale"
     const val fontScaleN = "fontScaleNight"

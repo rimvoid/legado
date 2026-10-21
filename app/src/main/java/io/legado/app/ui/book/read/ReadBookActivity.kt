@@ -4059,6 +4059,56 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
 
+    override fun refreshFollowAppearance() { binding.readView.invalidateTextPage() }
+
+    override fun showFollowPosition(position: Int) {
+        ReadBook.durChapterPos = position
+        binding.readView.upContent(0, false)
+    }
+
+    override fun followReaderLines() = binding.readView.curPage.followReaderLines()
+
+    override fun commitFollowLine(line: NativeFollowLine) {
+        if (line.chapter != ReadBook.durChapterIndex) {
+            val moved = when (line.chapter) {
+                ReadBook.durChapterIndex + 1 -> ReadBook.moveToNextChapter(false, false)
+                ReadBook.durChapterIndex - 1 -> ReadBook.moveToPrevChapter(false, false)
+                else -> false
+            }
+            if (!moved) return
+        }
+        val chapter = ReadBook.curTextChapter ?: return
+        val page = chapter.getPageIndexByCharIndex(line.position)
+        if (page < 0) return
+        ReadBook.durChapterPos = line.position
+        ReadAloud.play(this, pageIndex = page, startPos = line.position - chapter.getReadLength(page))
+    }
+
+    private fun clearNativeFollowHighlights() {
+        if (!FollowReaderAppearance.active) return
+        listOfNotNull(ReadBook.prevTextChapter, ReadBook.curTextChapter, ReadBook.nextTextChapter).forEach { chapter ->
+            for (index in 0 until chapter.pageSize) chapter.getPage(index)?.removePageAloudSpan()
+        }
+    }
+
+    override fun previewFollowLine(line: NativeFollowLine) {
+        clearNativeFollowHighlights()
+        // Both halves belong to the native spread; highlight its matching page, not only the left one.
+        val chapter = listOfNotNull(ReadBook.prevTextChapter, ReadBook.curTextChapter, ReadBook.nextTextChapter)
+            .firstOrNull { it.chapter.index == line.chapter } ?: return
+        chapter.getPage(line.page)?.upPageAloudSpan(line.position - chapter.getReadLength(line.page))
+        binding.readView.curPage.invalidateContentView()
+    }
+
+    override fun turnFollowPage(direction: Int): Boolean {
+        clearNativeFollowHighlights()
+        val directionEnum = if (direction > 0) io.legado.app.ui.book.read.page.entities.PageDirection.NEXT
+            else io.legado.app.ui.book.read.page.entities.PageDirection.PREV
+        val moved = binding.readView.fillPage(directionEnum)
+        if (moved) binding.readView.upContent(0, true)
+        return moved
+    }
+
     override fun onReadAloudPlayerVisibilityChanged(visible: Boolean) {
         ReadAloudAppCapsuleHost.updateReadBookPanelActive(visible)
         upSystemUiVisibility()
@@ -6219,6 +6269,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                     ReadBook.durChapterPos = chapterStart
                     val pageIndex = ReadBook.durPageIndex
                     val aloudSpanStart = chapterStart - textChapter.getReadLength(pageIndex)
+                    clearNativeFollowHighlights()
                     textChapter.getPage(pageIndex)?.upPageAloudSpan(aloudSpanStart)
                     if (pageIndex != previousPageIndex) {
                         upContent()

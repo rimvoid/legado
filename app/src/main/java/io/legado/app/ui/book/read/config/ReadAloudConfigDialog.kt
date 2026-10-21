@@ -70,6 +70,8 @@ enum class ReadAloudConfigGroup(
     Base(
         "\u57fa\u7840",
         setOf(
+            PreferKey.readAloudIconLabels,
+            PreferKey.readAloudFollowHighlight,
             PreferKey.ignoreAudioFocus,
             PreferKey.pauseReadAloudWhilePhoneCalls,
             PreferKey.readAloudWakeLock,
@@ -286,6 +288,8 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
 
         override fun onSettingPreferenceChanged(key: String) {
             when (key) {
+                PreferKey.readAloudIconLabels, PreferKey.readAloudFollowHighlight ->
+                    postReadAloudConfigChanged("follow_ui")
                 PreferKey.readAloudByPage, PreferKey.streamReadAloudAudio -> {
                     if (BaseReadAloudService.isRun) {
                         postEvent(EventBus.MEDIA_BUTTON, false)
@@ -394,7 +398,9 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
                     title = getString(R.string.pref_media_button_per_next),
                     summary = getString(R.string.pref_media_button_per_next_summary),
                     defaultValue = false
-                )
+                ),
+                switch(PreferKey.readAloudIconLabels, "图标文字说明", "显示目录、定时、引擎和角色的文字说明", defaultValue = true),
+                switch(PreferKey.readAloudFollowHighlight, "跟随高光指引", "在跟随模式标出当前朗读段落及拖动指引位置", defaultValue = true)
             )
         }
 

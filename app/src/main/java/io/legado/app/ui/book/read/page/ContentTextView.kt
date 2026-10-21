@@ -822,6 +822,38 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         return visiblePage
     }
 
+    fun followReaderLines(): List<io.legado.app.ui.book.read.NativeFollowLine> {
+        val location = IntArray(2)
+        getLocationOnScreen(location)
+        val result = mutableListOf<io.legado.app.ui.book.read.NativeFollowLine>()
+        fun collect(page: TextPage, x: Float, offset: Float, columnWidth: Float) {
+            for (line in page.lines) {
+                if (line.isVisible(offset) && line.charSize > 0) {
+                    result.add(io.legado.app.ui.book.read.NativeFollowLine(
+                        position = line.chapterPosition,
+                        top = location[1] + offset + line.lineTop,
+                        bottom = location[1] + offset + line.lineBottom,
+                        left = location[0] + x + line.lineStart,
+                        right = location[0] + x + line.lineEnd,
+                        chapter = page.chapterIndex, page = page.index,
+                        paragraph = line.paragraphNum, speaking = line.isReadAloud,
+                        columnLeft = location[0] + x, columnRight = location[0] + x + columnWidth
+                    ))
+                }
+            }
+        }
+        if (!callBack.isScroll && ChapterProvider.doublePage) {
+            collect(textPage, 0f, relativeOffset(0), width / 2f)
+            pairedTextPage?.let { collect(it, width / 2f, relativeOffset(0), width / 2f) }
+        } else {
+            for (relativePos in 0..2) {
+                if (relativePos > 0 && !callBack.isScroll) break
+                collect(relativePage(relativePos), 0f, relativeOffset(relativePos), width.toFloat())
+            }
+        }
+        return result
+    }
+
     fun getReadAloudPos(): Pair<Int, TextLine>? {
         var relativeOffset: Float
         for (relativePos in 0..2) {

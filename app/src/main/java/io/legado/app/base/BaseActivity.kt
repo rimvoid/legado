@@ -54,6 +54,13 @@ abstract class BaseActivity<VB : ViewBinding>(
 ) : AppCompatActivity() {
 
     protected abstract val binding: VB
+
+    override fun startActivityForResult(intent: android.content.Intent, requestCode: Int, options: Bundle?) {
+        super.startActivityForResult(
+            io.legado.app.help.adaptive.AdaptiveUiController.navigationIntent(this, intent),
+            requestCode, io.legado.app.help.adaptive.AdaptiveUiController.navigationOptions(this, intent, options)
+        )
+    }
     private var lastThemeValuesChanged = 0L
     private var lastNightMode = false
 

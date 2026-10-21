@@ -1288,6 +1288,8 @@ class PageView(context: Context) : FrameLayout(context) {
         return binding.contentTextView.getCurVisiblePage()
     }
 
+    fun followReaderLines() = binding.contentTextView.followReaderLines()
+
     fun getReadAloudPos(): Pair<Int, TextLine>? {
         return binding.contentTextView.getReadAloudPos()
     }
