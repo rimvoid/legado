@@ -10,6 +10,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 object AppUpdate {
 
+    /**
+     * 暂时关闭检查更新功能，恢复时改为 true
+     */
+    const val checkUpdateEnabled = false
+
     val giteeUpdate: AppUpdateInterface by lazy {
         AppUpdateGitee
     }
