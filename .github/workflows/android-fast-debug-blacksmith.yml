@@ -29,7 +29,7 @@ jobs:
       - name: Build arm64 debug APK
         run: |
           VERSION_CODE=$(($(date -u +%s) / 60))
-          ./gradlew :app:assembleAppDebug \
+          ./gradlew :app:assembleDebug \
             -Pabi=arm64-v8a \
             -PVERSION_CODE="$VERSION_CODE" \
             -PRELEASE_STORE_FILE=ci-debug.keystore \

@@ -27,6 +27,10 @@
         android:title="@string/dict" />
 
     <item
+        android:id="@+id/menu_word_lookup"
+        android:title="@string/word_lookup" />
+
+    <item
         android:id="@+id/menu_ask_ai"
         android:title="@string/ask_ai" />
 

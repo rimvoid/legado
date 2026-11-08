@@ -227,6 +227,15 @@ data class Book(
         config.reSegment = reSegment
     }
 
+    /**
+     * 取词模式, 按书记忆
+     */
+    fun isWordLookupEnabled(): Boolean = config.wordLookup == true
+
+    fun setWordLookup(enabled: Boolean) {
+        config.wordLookup = enabled
+    }
+
     fun getReSegment(): Boolean {
         return config.reSegment
     }
@@ -519,7 +528,8 @@ data class Book(
         var mangaDisableClickScroll: Boolean? = null,
         var mangaDisableScale: Boolean? = null,
         var mangaAutoPageSpeed: Int? = null,
-        var mangaPageAnim: Int? = null
+        var mangaPageAnim: Int? = null,
+        var wordLookup: Boolean? = null  // 取词模式, 按书记忆
     ) : Parcelable
 
     class Converters {

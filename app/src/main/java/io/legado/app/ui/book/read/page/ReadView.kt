@@ -50,6 +50,12 @@ import java.text.BreakIterator
 import java.util.Locale
 import kotlin.math.abs
 
+/** 取词时单词最大长度 */
+private const val MAX_LOOKUP_WORD_LENGTH = 48
+
+/** 单个中日韩词组的合理长度, 超过视为未分词 */
+private const val MAX_CJK_WORD_LENGTH = 8
+
 /**
  * 阅读视图
  */
@@ -362,7 +368,12 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 if (!pageDelegate!!.isMoved && !isMove) {
                     if (!longPressed && !pressOnTextSelected) {
                         if (!curPage.onClick(startX, startY)) {
-                            onSingleTapUp()
+                            // 取词模式优先查词, 未命中文字时仍按点击区域正常处理
+                            val wordLookupHandled = callBack.isWordLookupActive() &&
+                                    lookupWordAt(startX, startY)
+                            if (!wordLookupHandled) {
+                                onSingleTapUp()
+                            }
                         }
                         // A tap may synchronously start a page turn. This only commits when
                         // release really left the horizontal delegate idle.
@@ -541,6 +552,99 @@ class ReadView(context: Context, attrs: AttributeSet) :
     private fun dismissSelectionMagnifier() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
         selectionMagnifier?.dismiss()
+    }
+
+    /**
+     * 取词模式下点击命中文字, 交给词典查询
+     * @return true 表示已取到词并处理
+     */
+    private fun lookupWordAt(x: Float, y: Float): Boolean {
+        val word = runCatching { wordAtTap(x, y) }.getOrNull()?.takeIf { it.isNotBlank() }
+            ?: return false
+        callBack.showDictDialog(word)
+        return true
+    }
+
+    /**
+     * 取点击位置所在的词
+     */
+    private fun wordAtTap(x: Float, y: Float): String? {
+        val textPos = curPage.textPosAt(x, y) ?: return null
+        val page = curPage.relativePage(textPos.relativePagePos)
+        if (textPos.lineIndex !in 0 until page.lineSize) return null
+        // 取段落范围的文本, 便于跨行词组的词边界识别
+        var startLine = textPos.lineIndex
+        while (startLine > 0 && !page.getLine(startLine - 1).isParagraphEnd) {
+            startLine--
+        }
+        var endLine = textPos.lineIndex
+        while (endLine < page.lineSize - 1 && !page.getLine(endLine).isParagraphEnd) {
+            endLine++
+        }
+        val textBuilder = StringBuilder()
+        var charIndex = 0
+        for (index in startLine..endLine) {
+            val textLine = page.getLine(index)
+            if (index == textPos.lineIndex) {
+                var offset = 0
+                val columnCount = minOf(textPos.columnIndex, textLine.getColumnsCount())
+                for (columnIndex in 0 until columnCount) {
+                    val column = textLine.getColumn(columnIndex)
+                    offset += if (column is TextBaseColumn) column.charData.length else 1
+                }
+                charIndex = textBuilder.length + offset
+            }
+            textBuilder.append(textLine.text)
+        }
+        return expandWordAt(textBuilder.toString(), charIndex)
+    }
+
+    /**
+     * 按词边界扩展出完整单词
+     */
+    private fun expandWordAt(text: String, index: Int): String? {
+        if (text.isEmpty()) return null
+        val safeIndex = index.coerceIn(0, text.lastIndex)
+        val iterator = BreakIterator.getWordInstance(wordLocaleOf(text))
+        iterator.setText(text)
+        var start = iterator.first()
+        var end = iterator.next()
+        while (end != BreakIterator.DONE) {
+            if (safeIndex in start until end) break
+            start = end
+            end = iterator.next()
+        }
+        if (end == BreakIterator.DONE) return null
+        val word = text.substring(start, end).trim()
+        if (word.isEmpty() || word.none { it.isLetterOrDigit() }) return null
+        // 没有词典分词时中文可能被整句切出, 退化为单字查询
+        if (word.length > MAX_CJK_WORD_LENGTH && word.all { isCjkChar(it) }) {
+            return text.getOrNull(safeIndex)?.takeIf { it.isLetterOrDigit() }?.toString()
+        }
+        return word.take(MAX_LOOKUP_WORD_LENGTH)
+    }
+
+    private fun isCjkChar(char: Char): Boolean {
+        return when (char.code) {
+            in 0x3040..0x30FF, in 0x3400..0x4DBF, in 0x4E00..0x9FFF,
+            in 0xAC00..0xD7AF, in 0xF900..0xFAFF -> true
+            else -> false
+        }
+    }
+
+    /**
+     * 按正文内容选择分词语言, 中日文需要词典分词
+     */
+    private fun wordLocaleOf(text: String): Locale {
+        var hasCjk = false
+        for (char in text) {
+            when (char.code) {
+                in 0x3040..0x30FF -> return Locale.JAPANESE
+                in 0xAC00..0xD7AF -> return Locale.KOREAN
+                in 0x4E00..0x9FFF -> hasCjk = true
+            }
+        }
+        return if (hasCjk) Locale.CHINESE else Locale.ENGLISH
     }
 
     /**
@@ -979,5 +1083,9 @@ class ReadView(context: Context, attrs: AttributeSet) :
         fun openSearchActivity(searchWord: String?)
         fun upSystemUiVisibility()
         fun sureNewProgress(progress: BookProgress)
+        /** 取词模式是否开启 */
+        fun isWordLookupActive(): Boolean = false
+        /** 打开词典查询 */
+        fun showDictDialog(word: String) = Unit
     }
 }

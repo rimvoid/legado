@@ -1061,6 +1061,10 @@
     <string name="reset">重置</string>
     <string name="null_url">URL 为空</string>
     <string name="dict">字典</string>
+    <string name="word_lookup">取词</string>
+    <string name="word_lookup_on">取词模式已开启，点击单词即可查词，点击空白处照常翻页</string>
+    <string name="word_lookup_off">取词模式已关闭</string>
+    <string name="word_lookup_no_rule">没有启用的词典规则，请先添加</string>
     <string name="unknown_error">未知错误</string>
     <string name="autobackup_fail">自动备份失败\n%s</string>
     <string name="end">结束</string>

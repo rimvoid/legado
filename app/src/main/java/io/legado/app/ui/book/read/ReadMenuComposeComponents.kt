@@ -687,6 +687,7 @@ private fun ReadMenuButton(
 ) {
     val title = readMenuButtonTitle(ref, customButtonMetadata)
     val iconRes = readMenuButtonIconRes(ref, autoPageActive, isNightTheme)
+    val contentColor = style.primaryText
     val customIconPath = if (ref.type == ReadMenuButtonConfig.TYPE_CUSTOM) {
         ref.id.toLongOrNull()?.let { customButtonMetadata[it]?.iconPath }
     } else null
@@ -709,21 +710,21 @@ private fun ReadMenuButton(
                     setImageDrawable(
                         ReadMenuButtonIconHelper.drawable(context, ref, iconRes, customIconPath)
                     )
-                    setColorFilter(style.primaryText.toArgb(), PorterDuff.Mode.SRC_IN)
+                    setColorFilter(contentColor.toArgb(), PorterDuff.Mode.SRC_IN)
                 }
             },
             update = { imageView ->
                 imageView.setImageDrawable(
                     ReadMenuButtonIconHelper.drawable(imageView.context, ref, iconRes, customIconPath)
                 )
-                imageView.setColorFilter(style.primaryText.toArgb(), PorterDuff.Mode.SRC_IN)
+                imageView.setColorFilter(contentColor.toArgb(), PorterDuff.Mode.SRC_IN)
             },
             onRelease = { it.releaseComposeImage() },
             modifier = Modifier.size(22.dp)
         )
         Text(
             text = title,
-            color = style.primaryText,
+            color = contentColor,
             fontSize = 11.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

@@ -1679,6 +1679,31 @@ class EpubDirectWebLayer @JvmOverloads constructor(
         }
     }
 
+    /**
+     * 取点击位置所在的单词, 供取词模式使用
+     */
+    fun wordAtPoint(x: Float, y: Float, callback: (String?) -> Unit) {
+        if (destroyed || !documentReady) {
+            callback(null)
+            return
+        }
+        val view = currentWebView
+        val token = generation
+        val script = "(function(){try{var api=window.__legadoEpub;" +
+            "if(!api||!api.wordAt)return null;" +
+            "return api.wordAt($x,$y)||null;}catch(e){return null;}})();"
+        view.evaluateJavascript(script) { raw ->
+            if (destroyed || view !== currentWebView || token != generation) {
+                callback(null)
+                return@evaluateJavascript
+            }
+            val word = runCatching { JSONArray("[$raw]").optString(0) }
+                .getOrNull()
+                ?.takeIf { it.isNotBlank() && it != "null" }
+            callback(word)
+        }
+    }
+
     fun dismissAnnotation(onResult: (Boolean) -> Unit) {
         if (!documentReady) {
             onResult(false)

@@ -878,6 +878,10 @@
     <string name="reset">重設</string>
     <string name="null_url">url為空</string>
     <string name="dict">字典</string>
+    <string name="word_lookup">取詞</string>
+    <string name="word_lookup_on">取詞模式已開啟，點擊單詞即可查詞，點擊空白處照常翻頁</string>
+    <string name="word_lookup_off">取詞模式已關閉</string>
+    <string name="word_lookup_no_rule">沒有啟用的詞典規則，請先新增</string>
     <string name="unknown_error">未知錯誤</string>
     <string name="autobackup_fail">自動備份失敗\n%s</string>
     <string name="end">結束</string>

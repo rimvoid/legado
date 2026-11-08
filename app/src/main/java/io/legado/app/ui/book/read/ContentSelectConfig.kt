@@ -20,6 +20,11 @@ object ContentSelectConfig {
     const val ACTION_GENERATE_IMAGE = "generate_image"
     const val ACTION_SHARE_IMAGE = "share_image"
 
+    /**
+     * 取词模式开关, 常驻在长按文字菜单中, 不参与可配置菜单项
+     */
+    const val ACTION_WORD_LOOKUP = "word_lookup"
+
     private val legacyDefaultActions = setOf(
         ACTION_REPLACE,
         ACTION_COPY,

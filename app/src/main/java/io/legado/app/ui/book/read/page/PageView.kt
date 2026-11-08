@@ -1275,6 +1275,12 @@ class PageView(context: Context) : FrameLayout(context) {
         binding.contentTextView.longPress(x - imgBgPaddingStart, y - headerHeight, select)
 
     /**
+     * 点击位置的文本位置, 用于取词
+     */
+    fun textPosAt(x: Float, y: Float): TextPos? =
+        binding.contentTextView.textPosAt(x - imgBgPaddingStart, y - headerHeight)
+
+    /**
      * 选择文本
      */
     fun selectText(

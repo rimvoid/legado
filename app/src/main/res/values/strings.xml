@@ -1293,6 +1293,10 @@
     <string name="reset">Reset</string>
     <string name="null_url">Null url</string>
     <string name="dict">dict</string>
+    <string name="word_lookup">Lookup</string>
+    <string name="word_lookup_on">Word lookup on, tap a word to look it up; blank areas still turn pages</string>
+    <string name="word_lookup_off">Word lookup off</string>
+    <string name="word_lookup_no_rule">No enabled dict rule, please add one first</string>
     <string name="unknown_error">unknown error</string>
     <string name="export_no_chapter_name">No export chapter names</string>
     <string name="autobackup_fail">Autobackup failed\n%s</string>

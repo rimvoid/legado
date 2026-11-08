@@ -51,7 +51,7 @@ class AboutFragment : ComposeSettingFragment() {
             titleRes = titleRes,
             sections = listOf(
                 SettingSectionSpec(
-                    items = listOf(
+                    items = listOfNotNull(
                         action(
                             key = KEY_CONTRIBUTORS,
                             title = getString(R.string.contributors),
@@ -66,11 +66,15 @@ class AboutFragment : ComposeSettingFragment() {
                         ) {
                             showMdFile(getString(R.string.update_log), "updateLog.md")
                         },
-                        action(
-                            key = KEY_CHECK_UPDATE,
-                            title = getString(R.string.check_update)
-                        ) {
-                            checkUpdate()
+                        if (AppUpdate.checkUpdateEnabled) {
+                            action(
+                                key = KEY_CHECK_UPDATE,
+                                title = getString(R.string.check_update)
+                            ) {
+                                checkUpdate()
+                            }
+                        } else {
+                            null
                         },
                         action(
                             key = KEY_INTERNAL_BETA,

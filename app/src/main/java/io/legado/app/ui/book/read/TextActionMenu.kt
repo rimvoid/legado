@@ -161,6 +161,7 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
         R.id.menu_bookmark -> ContentSelectConfig.ACTION_BOOKMARK
         R.id.menu_aloud -> ContentSelectConfig.ACTION_ALOUD
         R.id.menu_dict -> ContentSelectConfig.ACTION_DICT
+        R.id.menu_word_lookup -> ContentSelectConfig.ACTION_WORD_LOOKUP
         R.id.menu_ask_ai -> ContentSelectConfig.ACTION_ASK_AI
         R.id.menu_generate_image -> ContentSelectConfig.ACTION_GENERATE_IMAGE
         R.id.menu_share_image -> ContentSelectConfig.ACTION_SHARE_IMAGE
@@ -170,7 +171,11 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
     private fun filteredMenuActions(): List<TextMenuAction> {
         return allMenuItems.mapNotNull { item ->
             val actionId = menuItemToActionId(item.itemId) ?: return@mapNotNull null
-            if (!configuredActionIds.contains(actionId)) return@mapNotNull null
+            // 取词入口常驻在长按菜单中, 不参与可配置菜单项
+            val isWordLookup = actionId == ContentSelectConfig.ACTION_WORD_LOOKUP
+            if (!isWordLookup && !configuredActionIds.contains(actionId)) {
+                return@mapNotNull null
+            }
             if (actionId == ContentSelectConfig.ACTION_REPLACE && !callBack.supportsReplaceRules()) {
                 return@mapNotNull null
             }
@@ -184,7 +189,8 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
                 } else {
                     item.title?.toString().orEmpty()
                 },
-                intent = item.intent
+                intent = item.intent,
+                active = isWordLookup && callBack.isWordLookupActive()
             )
         }
     }
@@ -410,6 +416,8 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
 
         fun supportsReplaceRules(): Boolean = true
 
+        fun isWordLookupActive(): Boolean = false
+
         fun onMenuItemSelected(itemId: Int): Boolean
 
         fun onMenuActionFinally()
@@ -429,7 +437,8 @@ private data class TextMenuAction(
     val itemId: Int,
     val actionId: String,
     val title: String,
-    val intent: Intent?
+    val intent: Intent?,
+    val active: Boolean = false
 )
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -547,14 +556,17 @@ private fun TextActionChip(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
+    val chipBackground = if (action.active) accent.copy(alpha = 0.22f) else background
+    val chipBorder = if (action.active) accent else accent.copy(alpha = 0.16f)
+    val chipTextColor = if (action.active) accent else textColor
     Box(
         modifier = Modifier
             .width(width)
             .height(height)
             .padding(horizontal = 3.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(background)
-            .border(1.dp, accent.copy(alpha = 0.16f), RoundedCornerShape(8.dp))
+            .background(chipBackground)
+            .border(1.dp, chipBorder, RoundedCornerShape(8.dp))
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
@@ -564,7 +576,7 @@ private fun TextActionChip(
     ) {
         Text(
             text = action.title,
-            color = textColor,
+            color = chipTextColor,
             fontSize = 12.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

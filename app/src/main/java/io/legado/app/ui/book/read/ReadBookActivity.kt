@@ -22,6 +22,7 @@ import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.view.WindowInsets
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -241,6 +242,7 @@ import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.hexString
 import io.legado.app.utils.iconItemOnLongClick
+import io.legado.app.utils.statusBarHeight
 import io.legado.app.utils.invisible
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.isTrue
@@ -562,6 +564,13 @@ class ReadBookActivity : BaseReadBookActivity(),
             override fun onTapAction(action: Int, x: Float, y: Float) {
                 handleEpubTapAction(action, x, y)
             }
+
+            override fun onWordLookup(word: String) {
+                showDictDialog(word)
+            }
+
+            override fun isWordLookupActive(): Boolean =
+                this@ReadBookActivity.isWordLookupActive()
 
             override fun onPreviousPage() {
                 previousEpubPage()
@@ -1644,6 +1653,10 @@ class ReadBookActivity : BaseReadBookActivity(),
 
             R.id.menu_dict -> {
                 showDialogFragment(DictDialog(selectedText))
+                return true
+            }
+            R.id.menu_word_lookup -> {
+                setWordLookupMode(!isWordLookupActive(), selectedText)
                 return true
             }
             R.id.menu_ask_ai -> {
@@ -4309,6 +4322,38 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun showSearchSetting() {
         showDialogFragment<MoreConfigDialog>()
+    }
+
+    /**
+     * 取词模式, 按书记忆
+     */
+    override fun isWordLookupActive(): Boolean = ReadBook.book?.isWordLookupEnabled() == true
+
+    /**
+     * 切换取词模式, 进入时顺带查询长按选中的字词
+     */
+    private fun setWordLookupMode(enabled: Boolean, lookupText: String? = null) {
+        val book = ReadBook.book ?: return
+        book.setWordLookup(enabled)
+        ReadBook.saveRead(fullUpdate = true)
+        toastOnUi(if (enabled) R.string.word_lookup_on else R.string.word_lookup_off)
+        if (!enabled) return
+        val word = lookupText?.trim().orEmpty()
+        if (word.isNotEmpty()) {
+            showDictDialog(word)
+        }
+        lifecycleScope.launch {
+            val hasDictRule = withContext(IO) { appDb.dictRuleDao.enabled.isNotEmpty() }
+            if (!hasDictRule) {
+                toastOnUi(R.string.word_lookup_no_rule)
+            }
+        }
+    }
+
+    override fun showDictDialog(word: String) {
+        val key = word.trim()
+        if (key.isEmpty()) return
+        showDialogFragment(DictDialog(key))
     }
 
     override fun isLibraryCloudEnabled(): Boolean {

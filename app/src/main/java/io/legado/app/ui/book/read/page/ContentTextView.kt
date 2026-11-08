@@ -702,6 +702,19 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     }
 
     /**
+     * 触碰位置对应的文本位置, 用于取词
+     */
+    fun textPosAt(x: Float, y: Float): TextPos? {
+        var result: TextPos? = null
+        touch(x, y) { _, textPos, _, _, column ->
+            if (column is TextBaseColumn) {
+                result = TextPos(textPos.relativePagePos, textPos.lineIndex, textPos.columnIndex)
+            }
+        }
+        return result
+    }
+
+    /**
      * 触碰位置信息
      * @param touched 回调
      */

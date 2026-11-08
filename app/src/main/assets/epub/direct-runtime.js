@@ -2761,6 +2761,118 @@
   readerChromeConfigKey=readerChromeConfigSignature();
   if(readerChromeSupported())positionReaderChrome();
   if(layoutRtl)detectRtlScrollType();
+
+  // 取词: 命中点的单词, 供阅读取词模式使用
+  var WORD_BREAK_PUNCTUATION='.,;:!?\'"()[]{}<>/\\|@#$%^&*+=~`-_';
+  function isWordCharCode(code){
+    if(code<=32)return false;
+    if(code>=0x2000&&code<=0x206f)return false;
+    if(code>=0x2e00&&code<=0x2e7f)return false;
+    if(code>=0x3000&&code<=0x303f)return false;
+    if(code>=0xfe10&&code<=0xfe1f)return false;
+    if(code>=0xfe30&&code<=0xfe4f)return false;
+    if(code>=0xff00&&code<=0xff0f)return false;
+    if(code>=0xff1a&&code<=0xff20)return false;
+    if(code>=0xff3b&&code<=0xff40)return false;
+    if(code>=0xff5b&&code<=0xff65)return false;
+    return WORD_BREAK_PUNCTUATION.indexOf(String.fromCharCode(code))<0;
+  }
+  function isCjkCode(code){
+    return (code>=0x3040&&code<=0x30ff)||(code>=0x3400&&code<=0x4dbf)||
+      (code>=0x4e00&&code<=0x9fff)||(code>=0xac00&&code<=0xd7af)||
+      (code>=0xf900&&code<=0xfaff);
+  }
+  function wordLocaleForText(text){
+    if(/[\u3040-\u30ff]/.test(text))return 'ja';
+    if(/[\uac00-\ud7af]/.test(text))return 'ko';
+    if(/[\u4e00-\u9fff]/.test(text))return 'zh';
+    return 'en';
+  }
+  function expandWordChars(text,index){
+    if(index<0||index>=text.length)return '';
+    if(!isWordCharCode(text.charCodeAt(index)))return '';
+    if(isCjkCode(text.charCodeAt(index)))return text.charAt(index);
+    var start=index,end=index+1;
+    while(start>0&&isWordCharCode(text.charCodeAt(start-1)))start--;
+    while(end<text.length&&isWordCharCode(text.charCodeAt(end)))end++;
+    return text.slice(start,end);
+  }
+  function segmentWordAt(text,index){
+    if(index<0||index>=text.length)return '';
+    try{
+      if(window.Intl&&window.Intl.Segmenter){
+        var segmenter=new Intl.Segmenter(wordLocaleForText(text),{granularity:'word'});
+        var iterator=segmenter.segment(text);
+        if(typeof Symbol!=='undefined'&&iterator[Symbol.iterator]){
+          var step=iterator[Symbol.iterator]();
+          var item=step.next();
+          while(!item.done){
+            var part=item.value;
+            if(index>=part.index&&index<part.index+part.segment.length){
+              return part.isWordLike?part.segment:'';
+            }
+            item=step.next();
+          }
+        }
+        return '';
+      }
+    }catch(_){}
+    return expandWordChars(text,index);
+  }
+  function charRectAt(node,index){
+    try{
+      var length=String(node.nodeValue||'').length;
+      if(index<0||index>=length)return null;
+      var range=document.createRange();
+      range.setStart(node,index);
+      range.setEnd(node,index+1);
+      var rect=range.getBoundingClientRect();
+      if(rect&&rect.width>0)return rect;
+    }catch(_){}
+    return null;
+  }
+  // caret 返回的是字符间隙, 点击落在字符右半边时 offset 会指向下一个字符,
+  // 用字形矩形与点击位置比对, 取真正被点到的那个字符
+  function caretCharIndex(node,offset,x){
+    var length=String(node.nodeValue||'').length;
+    if(length<=0)return -1;
+    var candidates=[];
+    if(offset>0)candidates.push(offset-1);
+    if(offset<length)candidates.push(offset);
+    var best=-1,bestDistance=Infinity;
+    for(var i=0;i<candidates.length;i++){
+      var index=candidates[i];
+      var rect=charRectAt(node,index);
+      if(!rect)continue;
+      if(x>=rect.left&&x<=rect.right)return index;
+      var distance=x<rect.left?rect.left-x:x-rect.right;
+      if(distance<bestDistance){bestDistance=distance;best=index;}
+    }
+    if(best>=0)return best;
+    return Math.max(0,Math.min(length-1,offset));
+  }
+  function wordAtPoint(x,y){
+    var node=null,offset=0;
+    try{
+      if(document.caretPositionFromPoint){
+        var position=document.caretPositionFromPoint(x,y);
+        node=position&&position.offsetNode;
+        offset=position&&position.offset||0;
+      }else if(document.caretRangeFromPoint){
+        var range=document.caretRangeFromPoint(x,y);
+        node=range&&range.startContainer;
+        offset=range&&range.startOffset||0;
+      }
+    }catch(_){}
+    if(!node||node.nodeType!==3)return '';
+    var text=String(node.nodeValue||'');
+    if(!text)return '';
+    var index=caretCharIndex(node,offset,x);
+    if(index<0)return '';
+    var word=segmentWordAt(text,index)||segmentWordAt(text,index-1)||segmentWordAt(text,index+1);
+    return word.length>48?word.slice(0,48):word;
+  }
+
   var api={
     token:activeToken,
     setToken:function(value){
@@ -2783,6 +2895,7 @@
     setReaderChromeData:setReaderChromeData,
     locateReadAloud:locateReadAloud,
     clearSelection:clearSelection,
+    wordAt:wordAtPoint,
     goToFragment:goToFragment,
     dismissAnnotation:dismissAnnotation,
     annotationVisible:function(){return annotationVisible;},

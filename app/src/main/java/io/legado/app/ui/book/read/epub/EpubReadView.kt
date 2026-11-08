@@ -52,6 +52,10 @@ class EpubReadView @JvmOverloads constructor(
         fun onDirectSourceImageAction(request: TextReaderImageActionRequest) = Unit
         fun onDirectRenderError(message: String, throwable: Throwable?) = Unit
         fun onLoadingPresentationChanged() = Unit
+        /** 取词模式是否开启 */
+        fun isWordLookupActive(): Boolean = false
+        /** 点击取到的单词 */
+        fun onWordLookup(word: String) = Unit
     }
 
     data class SelectionAnchor(
@@ -392,6 +396,28 @@ class EpubReadView @JvmOverloads constructor(
         }
         val listener = listener ?: return
         listener.onPageClick(x, y)
+        if (listener.isWordLookupActive()) {
+            val layer = initializedDirectLayer()
+            if (layer != null && layer.hasVisibleDocument) {
+                // 取词模式优先查词, 未命中文字时退回原有的点击动作
+                layer.wordAtPoint(x, y) { word ->
+                    if (!word.isNullOrBlank()) {
+                        listener.onWordLookup(word)
+                    } else {
+                        dispatchTapAction(listener, x, y)
+                    }
+                }
+                return
+            }
+        }
+        dispatchTapAction(listener, x, y)
+    }
+
+    private fun dispatchTapAction(
+        listener: Listener,
+        x: Float,
+        y: Float
+    ) {
         val column = when {
             x < width / 3f -> 0
             x < width * 2f / 3f -> 1
