@@ -81,9 +81,9 @@ jobs:
           command: |
             source "$BASH_ENV"
             chmod +x gradlew
-            rm -rf release-apks app/build/outputs/apk/app/release
+            rm -rf release-apks app/build/outputs/apk/release
             mkdir -p release-apks
-            ./gradlew :app:assembleAppRelease \
+            ./gradlew :app:assembleRelease \
               -Pabi=arm64-v8a \
               -PVERSION_NAME="$VERSION_NAME" \
               -PVERSION_CODE="$VERSION_CODE" \
@@ -91,7 +91,7 @@ jobs:
               --parallel \
               --daemon \
               --stacktrace
-            APK_PATH=$(find app/build/outputs/apk/app/release -type f -name '*.apk' | head -n 1)
+            APK_PATH=$(find app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)
             test -n "$APK_PATH"
             cp "$APK_PATH" "release-apks/legado-arm64-v8a_app_${VERSION_NAME}_${VERSION_CODE}.apk"
 

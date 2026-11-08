@@ -88,25 +88,25 @@ jobs:
 
       - name: Build arm64 release APK
         run: |
-          rm -rf release-apks app/build/outputs/apk/app/release
+          rm -rf release-apks app/build/outputs/apk/release
           mkdir -p release-apks
-          ./gradlew :app:clean :app:assembleAppRelease \
+          ./gradlew :app:clean :app:assembleRelease \
             -Pabi=arm64-v8a \
             -PVERSION_NAME="${{ steps.version.outputs.name }}" \
             -PVERSION_CODE="${{ steps.version.outputs.code }}" \
             --stacktrace
-          APK_PATH=$(find app/build/outputs/apk/app/release -type f -name '*.apk' | head -n 1)
+          APK_PATH=$(find app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)
           cp "$APK_PATH" "release-apks/legado-arm64-v8a_app_${{ steps.version.outputs.name }}_${{ steps.version.outputs.code }}.apk"
 
       - name: Build armeabi-v7a release APK
         run: |
-          rm -rf app/build/outputs/apk/app/release
-          ./gradlew :app:clean :app:assembleAppRelease \
+          rm -rf app/build/outputs/apk/release
+          ./gradlew :app:clean :app:assembleRelease \
             -Pabi=armeabi-v7a \
             -PVERSION_NAME="${{ steps.version.outputs.name }}" \
             -PVERSION_CODE="${{ steps.version.outputs.code }}" \
             --stacktrace
-          APK_PATH=$(find app/build/outputs/apk/app/release -type f -name '*.apk' | head -n 1)
+          APK_PATH=$(find app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)
           cp "$APK_PATH" "release-apks/legado-armeabi-v7a_app_${{ steps.version.outputs.name }}_${{ steps.version.outputs.code }}.apk"
 
       - name: Upload APK artifact

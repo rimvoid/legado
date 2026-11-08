@@ -19,6 +19,8 @@ static def releaseTime() {
 }
 
 def name = "legado"
+// 原 flavor "app" 仅用于渠道值与 APK 文件名，移除 flavor 后保留以维持产物不变
+def channel = "app"
 def version = project.hasProperty("VERSION_NAME")
         ? project.property("VERSION_NAME").toString()
         : "3." + releaseTime()
@@ -60,6 +62,7 @@ android {
     }
     defaultConfig {
         applicationId "io.legado.app"
+        manifestPlaceholders.put("APP_CHANNEL_VALUE", channel)
         minSdk 21
         targetSdk 36
         multiDexEnabled true
@@ -119,19 +122,9 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro', 'cronet-proguard-rules.pro'
         }
     }
-    //noinspection GrDeprecatedAPIUsage
-    flavorDimensions = ['mode']
-    productFlavors {
-        app {
-            dimension "mode"
-            manifestPlaceholders.put("APP_CHANNEL_VALUE", "app")
-        }
-    }
-
     android.applicationVariants.configureEach { variant ->
         variant.outputs.configureEach {
-            def flavor = variant.productFlavors[0].name
-            outputFileName = "${name}_${flavor}_${defaultConfig.versionName}_${defaultConfig.versionCode}.apk"
+            outputFileName = "${name}_${channel}_${defaultConfig.versionName}_${defaultConfig.versionCode}.apk"
         }
     }
 
@@ -140,7 +133,7 @@ android {
         def copyTask = tasks.register("copy${variantName}ApkToCurrentDir") {
             doLast {
                 copy {
-                    from(layout.buildDirectory.dir("outputs/apk/${variant.flavorName}/${variant.buildType.name}")) {
+                    from(layout.buildDirectory.dir("outputs/apk/${variant.buildType.name}")) {
                         include("*.apk")
                     }
                     into(rootProject.projectDir.parentFile)
@@ -187,6 +180,8 @@ android {
     }
     lint { //蹇界暐string缈昏瘧缂哄け锛屽悗闈㈤渶瑕佺炕璇戞椂鍘绘帀锛宼odo
         disable 'MissingTranslation'
+        // 本地打包装机用途：跳过 release 的 lintVital，降低构建内存与耗时；需要发版质量检查时改回 true
+        checkReleaseBuilds = false
     }
 }
 
