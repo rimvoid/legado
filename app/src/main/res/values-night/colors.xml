@@ -1,15 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#5E9DFF</color>
-    <color name="primaryDark">#3F7FE0</color>
-    <color name="accent">#0A84FF</color>
+    <!-- COUI-Kit / ColorOS 17 夜间强调色 -->
+    <color name="primary">#1A8CFF</color>
+    <color name="primaryDark">#136FD1</color>
+    <color name="accent">#1A8CFF</color>
 
     <color name="disabled">@color/md_dark_disabled</color>
 
-    <color name="background">#111113</color>
-    <color name="background_card">#1C1C1E</color>
-    <color name="background_menu">#252528</color>
-    <color name="dialog_surface">#1C1C1E</color>
+    <!-- COUI 夜间中性表面：页面纯黑，卡片 #1E1E1E -->
+    <color name="background">#000000</color>
+    <color name="background_card">#1E1E1E</color>
+    <color name="background_menu">#1E1E1E</color>
+    <color name="dialog_surface">#1E1E1E</color>
     <color name="book_info_frost">#DD252528</color>
     <color name="background_prefs">#241C1C1E</color>
     <color name="glass_bar">#A81F242C</color>

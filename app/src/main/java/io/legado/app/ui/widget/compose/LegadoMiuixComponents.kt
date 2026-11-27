@@ -88,6 +88,18 @@ import top.yukonga.miuix.kmp.basic.SliderDefaults as MiuixSliderDefaults
 import top.yukonga.miuix.kmp.basic.Switch as MiuixSwitch
 import top.yukonga.miuix.kmp.basic.SwitchDefaults as MiuixSwitchDefaults
 
+// COUI-Kit（ColorOS 17 凝光视效）：核心交互控件改由 COUI 承载。
+// 保留 Miuix 别名以兼容尚未迁移的分支，逐步由 COUI 接管。
+import com.itos.coui.switch.Switch as CouiSwitch
+import com.itos.coui.switch.CouiSwitchDefaults
+import com.itos.coui.slider.Slider as CouiSlider
+import com.itos.coui.slider.CouiSliderDefaults
+import com.itos.coui.shape.CouiShape
+import com.itos.coui.shape.CouiCapsuleShape
+import com.itos.coui.theme.CouiTheme
+import com.itos.coui.theme.LocalCouiDarkTheme
+import io.legado.app.help.config.AppConfig
+
 private const val MIUIX_PANEL_ANIMATION_MS = 160
 private const val MIUIX_PANEL_DISMISS_MS = MIUIX_PANEL_ANIMATION_MS + 20L
 
@@ -156,6 +168,9 @@ fun LegadoMiuixCard(
     insidePadding: PaddingValues = PaddingValues(0.dp),
     content: @Composable ColumnScope.() -> Unit
 ) {
+    // COUI 风格：使用 ColorOS G2 连续圆角（CouiShape）替代普通圆角，
+    // 卡片容器沿用现有实现承载内容，确保零回归。
+    val couiCardShape = CouiShape(cornerRadius)
     if (canUseRealMiuix()) {
         MiuixCard(
             modifier = modifier,
@@ -171,7 +186,7 @@ fun LegadoMiuixCard(
     }
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(cornerRadius),
+        shape = couiCardShape,
         color = color,
         contentColor = contentColor,
         tonalElevation = 0.dp,
@@ -207,6 +222,8 @@ fun LegadoMiuixActionButton(
         danger -> palette.danger
         else -> palette.primaryText
     }
+    // COUI 风格：按钮采用 ColorOS G2 连续圆角。
+    val couiButtonShape = CouiShape(resolvedCornerRadius)
     if (canUseRealMiuix()) {
         MiuixButton(
             onClick = onClick,
@@ -238,7 +255,7 @@ fun LegadoMiuixActionButton(
         modifier = modifier
             .defaultMinSize(minWidth = minWidth, minHeight = effectiveMinHeight)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(resolvedCornerRadius),
+        shape = couiButtonShape,
         color = background,
         contentColor = content,
         tonalElevation = 0.dp,
@@ -273,45 +290,40 @@ fun LegadoMiuixSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
+    val dark = AppConfig.isNightTheme
     val switchModifier = modifier.shadow(
-        elevation = if (enabled) 3.dp else 1.dp,
-        shape = RoundedCornerShape(50),
+        elevation = if (enabled) 2.dp else 0.dp,
+        shape = CouiCapsuleShape,
         clip = false
     )
-    if (canUseRealMiuix()) {
-        MiuixSwitch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            enabled = enabled,
-            modifier = switchModifier,
-            colors = MiuixSwitchDefaults.switchColors(
-                checkedThumbColor = palette.onAccent,
-                uncheckedThumbColor = palette.secondaryText.copy(alpha = 0.72f),
-                disabledCheckedThumbColor = palette.onAccent.copy(alpha = 0.42f),
-                disabledUncheckedThumbColor = palette.secondaryText.copy(alpha = 0.32f),
-                checkedTrackColor = palette.accent,
-                uncheckedTrackColor = palette.surfaceVariant,
-                disabledCheckedTrackColor = palette.accent.copy(alpha = 0.24f),
-                disabledUncheckedTrackColor = palette.surfaceVariant.copy(alpha = 0.46f)
+    // COUI Switch（ColorOS 17 风格）：原生胶囊 + 跟手反馈 + 可选加载态。
+    // 通过显式 colors 把 legado 主题色注入 COUI 控件，保持与 App 主题一致。
+    val couiColors = CouiSwitchDefaults.colors(accent = palette.accent, dark = dark)
+    CouiTheme(darkTheme = dark, colorScheme = palette.toCouiColorScheme()) {
+        CompositionLocalProvider(LocalCouiDarkTheme provides dark) {
+            CouiSwitch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                enabled = enabled,
+                modifier = switchModifier,
+                colors = couiColors,
             )
-        )
-        return
+        }
     }
-    Switch(
-        checked = checked,
-        onCheckedChange = onCheckedChange,
-        enabled = enabled,
-        modifier = switchModifier,
-        colors = SwitchDefaults.colors(
-            checkedThumbColor = palette.onAccent,
-            uncheckedThumbColor = palette.secondaryText.copy(alpha = 0.72f),
-            disabledCheckedThumbColor = palette.onAccent.copy(alpha = 0.42f),
-            disabledUncheckedThumbColor = palette.secondaryText.copy(alpha = 0.32f),
-            checkedTrackColor = palette.accent,
-            uncheckedTrackColor = palette.surfaceVariant,
-            disabledCheckedTrackColor = palette.accent.copy(alpha = 0.24f),
-            disabledUncheckedTrackColor = palette.surfaceVariant.copy(alpha = 0.46f)
-        )
+}
+
+/** 把 legado 组件色板映射为 COUI 色板，供局部 CouiTheme 使用。 */
+internal fun LegadoMiuixPalette.toCouiColorScheme(): com.itos.coui.theme.CouiColorScheme {
+    return com.itos.coui.theme.CouiColorScheme(
+        accent = accent,
+        onAccent = onAccent,
+        surface = surface,
+        container = surfaceVariant,
+        onSurface = primaryText,
+        onSurfaceVariant = secondaryText,
+        outlineVariant = secondaryText.copy(alpha = 0.3f),
+        background = surface,
+        card = surface,
     )
 }
 
@@ -326,49 +338,28 @@ fun LegadoMiuixSlider(
     enabled: Boolean = true,
     onValueChangeFinished: (() -> Unit)? = null
 ) {
-    if (canUseRealMiuix()) {
-        MiuixSlider(
-            value = value,
-            onValueChange = onValueChange,
-            onValueChangeFinished = onValueChangeFinished,
-            modifier = modifier.fillMaxWidth(),
-            valueRange = valueRange,
-            steps = steps,
-            enabled = enabled,
-            colors = MiuixSliderDefaults.sliderColors(
-                foregroundColor = palette.accent,
-                disabledForegroundColor = palette.accent.copy(alpha = 0.28f),
-                backgroundColor = palette.surfaceVariant,
-                disabledBackgroundColor = palette.surfaceVariant.copy(alpha = 0.44f),
-                thumbColor = palette.onAccent,
-                disabledThumbColor = palette.onAccent.copy(alpha = 0.42f),
-                keyPointColor = palette.secondaryText.copy(alpha = 0.32f),
-                keyPointForegroundColor = palette.onAccent.copy(alpha = 0.68f)
+    val dark = AppConfig.isNightTheme
+    // COUI Slider（ColorOS 17 风格）：胶囊轨道 + 刻度 + 跟手感。
+    CouiTheme(darkTheme = dark, colorScheme = palette.toCouiColorScheme()) {
+        CompositionLocalProvider(LocalCouiDarkTheme provides dark) {
+            CouiSlider(
+                value = value,
+                onValueChange = onValueChange,
+                onValueChangeFinished = onValueChangeFinished ?: {},
+                modifier = modifier.fillMaxWidth(),
+                valueRange = valueRange,
+                steps = steps,
+                showTickMarks = steps > 0,
+                enabled = enabled,
+                colors = CouiSliderDefaults.colors(
+                    primary = palette.accent,
+                    dark = dark,
+                    enabled = enabled,
+                ),
+                shape = CouiCapsuleShape,
             )
-        )
-        return
+        }
     }
-    Slider(
-        value = value,
-        onValueChange = onValueChange,
-        onValueChangeFinished = onValueChangeFinished,
-        modifier = modifier.fillMaxWidth(),
-        valueRange = valueRange,
-        steps = steps,
-        enabled = enabled,
-        colors = SliderDefaults.colors(
-            activeTrackColor = palette.accent,
-            inactiveTrackColor = palette.surfaceVariant,
-            thumbColor = palette.onAccent,
-            activeTickColor = palette.onAccent.copy(alpha = 0.72f),
-            inactiveTickColor = palette.secondaryText.copy(alpha = 0.32f),
-            disabledActiveTrackColor = palette.accent.copy(alpha = 0.28f),
-            disabledInactiveTrackColor = palette.surfaceVariant.copy(alpha = 0.44f),
-            disabledThumbColor = palette.onAccent.copy(alpha = 0.42f),
-            disabledActiveTickColor = palette.onAccent.copy(alpha = 0.34f),
-            disabledInactiveTickColor = palette.secondaryText.copy(alpha = 0.18f)
-        )
-    )
 }
 
 @Composable

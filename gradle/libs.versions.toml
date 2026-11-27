@@ -2,7 +2,8 @@
 
 kotlin = "2.3.10"
 ksp = "2.3.7"
-agp = "8.13.2"
+# COUI-Kit AAR 要求 AGP >= 9.1.0
+agp = "9.4.1"
 appcompat = "1.7.1"
 colorpicker = "1.1.0"
 constraintlayout = "2.2.1"
@@ -41,6 +42,8 @@ collection = "1.5.0"
 composeBom = "2025.10.00"
 composeMaterial3 = "1.4.0"
 miuix = "0.8.8"
+# COUI-Kit（ColorOS 17 凝光视效）：各模块必须同版本
+coui = "0.0.1-alpha21"
 reorderable = "3.1.0"
 lazyColumnScrollbar = "2.2.0"
 
@@ -193,6 +196,9 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "composeMaterial3" }
 miuix-android = { module = "top.yukonga.miuix.kmp:miuix-android", version.ref = "miuix" }
+# COUI-Kit：ColorOS 17 风格 Compose 组件与视觉效果库（JitPack）
+coui-core = { module = "com.github.itoseo.coui-kit:coui", version.ref = "coui" }
+coui-icons = { module = "com.github.itoseo.coui-kit:coui-icons", version.ref = "coui" }
 lazycolumnscrollbar = { module = "com.github.nanihadesuka:LazyColumnScrollbar", version.ref = "lazyColumnScrollbar" }
 colorpicker = { module = "com.jaredrummler:colorpicker", version.ref = "colorpicker" }
 commons-text = { module = "org.apache.commons:commons-text", version.ref = "commonsText" }

@@ -60,7 +60,8 @@ android {
     }
     defaultConfig {
         applicationId "io.legado.app"
-        minSdk 21
+        // COUI-Kit AAR 声明 minSdkVersion=31，应用需对齐
+        minSdk 31
         targetSdk 36
         multiDexEnabled true
         multiDexKeepFile file('multidex-config.txt')
@@ -238,6 +239,12 @@ dependencies {
     implementation(libs.reorderable)
     implementation(libs.lazycolumnscrollbar)
     implementation(libs.miuix.android)
+
+    // COUI-Kit：ColorOS 17 凝光视效组件库。
+    // 仅引入 core + icons：legado 使用自研主题（非 M3 ColorScheme），
+    // 通过 LegadoCouiTheme 的局部 CouiTheme 提供主题色，无需 coui-material3 适配模块。
+    implementation(libs.coui.core)
+    implementation(libs.coui.icons)
 
     //google
     implementation(libs.material)

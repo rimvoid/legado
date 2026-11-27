@@ -1,0 +1,251 @@
+# 构建调试用 Debug APK
+# 独立于仓库内其他工作流，不依赖任何 Secrets 即可产出可调试的安装包。
+# 目标变体：:app:assembleAppDebug（flavor=app + buildType=debug）
+#
+# 重要：仓库默认 org.gradle.jvmargs=-Xmx3g，未单独配置时 Kotlin daemon 会继承
+# 这个 -Xmx。编译超大 Composable（WorldBookEntryEditor）时 Kotlin 后端内存会爆，
+# 因此本工作流在 CI 里重分配：Gradle daemon 2g + Kotlin daemon 独立堆（默认 4g）。
+name: Debug APK
+run-name: 构建Debug APK
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+  workflow_dispatch:
+    inputs:
+      clean:
+        description: '先执行 clean 再构建（排查缓存/增量编译问题时打开）'
+        type: boolean
+        default: false
+      abi:
+        description: '只打指定 ABI，留空为全架构，可选 arm64-v8a / armeabi-v7a / x86_64 / x86'
+        type: string
+        default: ''
+      run_lint:
+        description: '额外执行 :app:lintAppDebug（结果不阻断 APK 产出）'
+        type: boolean
+        default: false
+      kotlin_heap:
+        description: 'Kotlin 编译守护进程堆大小；编译 OOM 时调大，如 4g / 5g'
+        type: string
+        default: '4g'
+      enable_swap:
+        description: '额外创建 6G swap 兜底（内存仍不够时打开，会明显变慢）'
+        type: boolean
+        default: false
+      keep_days:
+        description: '构建产物保留天数（1-90）'
+        type: number
+        default: 14
+
+permissions:
+  contents: read
+
+concurrency:
+  group: debug-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    env:
+      # 通过环境变量传递用户输入，避免把字符串直接插值进 shell
+      INPUT_CLEAN: ${{ inputs.clean }}
+      INPUT_ABI: ${{ inputs.abi }}
+      INPUT_KOTLIN_HEAP: ${{ inputs.kotlin_heap }}
+
+    steps:
+      - name: 检出代码（保留完整历史）
+        uses: actions/checkout@v4
+        with:
+          # app/build.gradle 用 `git rev-list HEAD --count` 计算 versionCode，
+          # 默认的浅克隆会让它恒等于 10000，因此必须取全量历史。
+          fetch-depth: 0
+
+      - name: 可选：扩展 swap 兜底
+        if: ${{ inputs.enable_swap }}
+        shell: bash
+        run: |
+          # 只追加一块 swap，不动 runner 自带的 swap（swapoff -a 会关掉系统已有交换空间）
+          if [ ! -f /mnt/swapfile ]; then
+            sudo fallocate -l 6G /mnt/swapfile
+            sudo chmod 600 /mnt/swapfile
+            sudo mkswap /mnt/swapfile
+            sudo swapon /mnt/swapfile
+          fi
+          free -h
+          swapon --show
+
+      - name: 配置 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 配置 Gradle 缓存
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          gradle-home-cache-cleanup: true
+
+      - name: 安装 Android SDK 组件
+        shell: bash
+        run: |
+          # compileSdk / targetSdk = 36，需要 Platform 36 与对应 Build Tools
+          SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(command -v sdkmanager)"
+          fi
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" --install "platform-tools" "platforms;android-36"
+          # build-tools 具体版本由 AGP 按 compileSdk 自动解析，装不上只给警告
+          if ! "$SDKMANAGER" --install "build-tools;36.0.0"; then
+            echo "::warning::build-tools;36.0.0 未安装，交由 AGP 自动解析所需版本"
+          fi
+
+      - name: 调优 CI 内存分配
+        shell: bash
+        run: |
+          # Kotlin daemon 未单独配置时会继承 org.gradle.jvmargs 的 -Xmx，
+          # 两个 JVM 叠加容易把 hosted runner 内存吃满。这里把 Gradle daemon
+          # 降到 2g，把大头单独给 Kotlin daemon（编译才是内存峰值所在）。
+          # 只修改本次 CI 工作区的副本，不会提交回仓库。
+          sed -i 's|^org\.gradle\.jvmargs=.*|org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=768m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8|' gradle.properties
+          cat >> gradle.properties <<EOF
+
+          # === CI 内存配置（debug-apk 工作流写入，不提交）===
+          kotlin.daemon.jvmargs=-Xmx${INPUT_KOTLIN_HEAP:-4g} -Xms512m -XX:+UseParallelGC -XX:MaxMetaspaceSize=512m
+          org.gradle.workers.max=2
+          EOF
+          echo "::notice::Gradle daemon=2g / Kotlin daemon=${INPUT_KOTLIN_HEAP:-4g} / workers=2"
+          tail -n 5 gradle.properties
+
+      - name: 组装 Debug APK
+        id: assemble
+        shell: bash
+        run: |
+          chmod +x gradlew
+          GRADLE_ARGS=(--stacktrace)
+          if [ "$INPUT_CLEAN" = "true" ]; then
+            GRADLE_ARGS+=(clean)
+          fi
+          if [ -n "$INPUT_ABI" ]; then
+            GRADLE_ARGS+=("-Pabi=${INPUT_ABI}")
+          fi
+          ./gradlew "${GRADLE_ARGS[@]}" :app:assembleAppDebug
+
+          APK_DIR="app/build/outputs/apk/app/debug"
+          APK="$(find "$APK_DIR" -maxdepth 1 -type f -name '*.apk' 2>/dev/null | head -n 1 || true)"
+          if [ -z "$APK" ]; then
+            echo "::error::未在 $APK_DIR 找到 APK，请查看上方 Gradle 日志"
+            exit 1
+          fi
+          echo "apk=$APK" >> "$GITHUB_OUTPUT"
+          echo "apk_name=$(basename "$APK")" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: 生成构建信息
+        id: meta
+        shell: bash
+        env:
+          APK_NAME: ${{ steps.assemble.outputs.apk_name }}
+          APK_PATH: ${{ steps.assemble.outputs.apk }}
+          SHORT_SHA: ${{ steps.assemble.outputs.sha }}
+        run: |
+          INFO="${RUNNER_TEMP}/build-info.txt"
+          {
+            echo "项目:        ${{ github.repository }}"
+            echo "分支/引用:   ${{ github.ref_name }}"
+            echo "Commit:      ${{ github.sha }}"
+            echo "触发事件:    ${{ github.event_name }}"
+            echo "运行编号:    #${{ github.run_number }}"
+            echo "变体:        appDebug"
+            echo "Gradle 任务: :app:assembleAppDebug"
+            echo "APK 文件:    ${APK_NAME}"
+            echo "包名:        io.legado.app.debug"
+            echo "APK 大小:    $(du -h "$APK_PATH" | cut -f1)"
+            echo "ABI 过滤:    ${INPUT_ABI:-未指定（全架构）}"
+            echo "内存配置:    Gradle daemon 2g / Kotlin daemon ${INPUT_KOTLIN_HEAP:-4g} / workers 2"
+            echo "可调试:      debuggable=true（debug 变体默认值）"
+            echo "签名:        AGP 默认 debug.keystore（未配置 Secrets）"
+          } > "$INFO"
+
+          echo "artifact_name=legado-app-debug-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### ✅ Debug APK 构建完成"
+            echo ""
+            echo "| 项 | 值 |"
+            echo "| --- | --- |"
+            echo "| APK | \`${APK_NAME}\` |"
+            echo "| 包名 | \`io.legado.app.debug\` |"
+            echo "| Commit | \`${SHORT_SHA}\` |"
+            echo "| 触发 | \`${{ github.event_name }}\` · #${{ github.run_number }} |"
+            echo ""
+            echo "在本次运行页面的 **Artifacts** 中下载 \`legado-app-debug-${SHORT_SHA}\`。"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 上传 Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.artifact_name }}
+          path: |
+            ${{ steps.assemble.outputs.apk }}
+            ${{ runner.temp }}/build-info.txt
+          retention-days: ${{ inputs.keep_days || 14 }}
+          if-no-files-found: error
+          # APK 本身已是压缩包，跳过二次压缩
+          compression-level: 0
+
+      - name: 可选：执行 lint
+        if: ${{ inputs.run_lint }}
+        continue-on-error: true
+        shell: bash
+        run: ./gradlew :app:lintAppDebug
+
+      - name: 失败时收集诊断信息
+        if: failure()
+        shell: bash
+        run: |
+          OUT="${RUNNER_TEMP}/diagnostics"
+          mkdir -p "$OUT"
+          # 根项目的 Problems report 与 app 的各类报告位于不同目录，都要收
+          cp -r build/reports "$OUT/root-reports" 2>/dev/null || true
+          cp -r app/build/reports "$OUT/app-reports" 2>/dev/null || true
+          # Kotlin daemon 才是 OOM 发生地，它的日志在 ~/.gradle/kotlin/daemon
+          mkdir -p "$OUT/gradle-logs"
+          cp -r "$HOME/.gradle/daemon" "$OUT/gradle-logs/daemon" 2>/dev/null || true
+          cp -r "$HOME/.gradle/kotlin/daemon" "$OUT/gradle-logs/kotlin-daemon" 2>/dev/null || true
+          {
+            echo "run_id=${{ github.run_id }}"
+            echo "ref=${{ github.ref }}"
+            echo "sha=${{ github.sha }}"
+            echo "java=$(java -version 2>&1 | head -n 1)"
+            echo "kotlin_heap=${INPUT_KOTLIN_HEAP:-4g}"
+          } > "$OUT/context.txt"
+          free -h > "$OUT/memory.txt" 2>&1 || true
+          find "$HOME" -maxdepth 4 \( -name 'hs_err_pid*.log' -o -name '*.hprof' \) \
+            -printf '%p  %k KB\n' >> "$OUT/memory.txt" 2>/dev/null || true
+          if grep -rqi 'OutOfMemoryError\|GC overhead limit' "$OUT" 2>/dev/null; then
+            echo "::error::检测到内存溢出，请调大 kotlin_heap 或打开 enable_swap 后重跑"
+          fi
+
+      - name: 失败时上传诊断日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-build-diagnostics-${{ github.run_number }}
+          path: ${{ runner.temp }}/diagnostics/
+          retention-days: 7
+          if-no-files-found: warn
