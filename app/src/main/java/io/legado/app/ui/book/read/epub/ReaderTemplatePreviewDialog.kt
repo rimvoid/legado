@@ -64,7 +64,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import top.yukonga.miuix.kmp.theme.MiuixTheme
+import io.legado.app.ui.widget.compose.LegadoCouiTheme
 import java.util.UUID
 
 /** A real reader surface whose position and lifetime are independent of the main reader. */
@@ -132,7 +132,7 @@ class ReaderTemplatePreviewDialog : ComposeDialogFragment() {
         }
         return ComposeView(requireContext()).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent { MiuixTheme { PreviewContent(current) } }
+            setContent { LegadoCouiTheme { PreviewContent(current) } }
         }
     }
 

@@ -34,7 +34,10 @@ fun LegadoComposeTheme(content: @Composable () -> Unit) {
         CompositionLocalProvider(
             LocalTextStyle provides LocalTextStyle.current.copy(fontFamily = bodyFamily)
         ) {
-            content()
+            // 同时下发 COUI 主题，使子树内的 COUI 组件跟随 legado 主题色与日夜模式。
+            LegadoCouiTheme {
+                content()
+            }
         }
     }
 }

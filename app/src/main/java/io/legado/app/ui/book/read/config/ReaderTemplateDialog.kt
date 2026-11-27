@@ -69,7 +69,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import top.yukonga.miuix.kmp.theme.MiuixTheme
+import io.legado.app.ui.widget.compose.LegadoCouiTheme
 import java.io.File
 
 class ReaderTemplateDialog : ReaderBottomSheetComposeDialogFragment() {
@@ -151,7 +151,7 @@ class ReaderTemplateDialog : ReaderBottomSheetComposeDialogFragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
         ComposeView(requireContext()).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent { MiuixTheme { this@ReaderTemplateDialog.ReaderTemplateContent() } }
+            setContent { LegadoCouiTheme { this@ReaderTemplateDialog.ReaderTemplateContent() } }
         }
 
     @Composable
